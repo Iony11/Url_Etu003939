@@ -1,0 +1,4 @@
+-on lance tomcat : Deploy.sh
+-entrer dans : http://localhost:8080/Url
+-taper apres n'importe quel lien que vous vouler 
+-redirection vers accueil.jsp
