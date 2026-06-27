@@ -1,14 +1,20 @@
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.List;
-import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
+import java.lang.reflect.Method;
 import java.net.JarURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
+
 import annotation.Controller;
-import jakarta.servlet.RequestDispatcher;
+import annotation.UrlMapping;
+import annotation.Mapping;
+
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,34 +22,41 @@ import jakarta.servlet.http.HttpServletResponse;
 
 public class DispatcherServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
+    
+    // Déclaration de la Map globale
+    private Map<String, Mapping> urlMappingMap = new HashMap<>();
 
     @Override
     public void init() throws ServletException {
-        System.out.println("=== DEBUT SCANNING DES CONTROLLERS ===");
+        System.out.println("=== DEBUT SCANNING DES URLS ===");
+        urlMappingMap.clear();
         
-        String packageToScan = "controllers";
-        List<Class<?>> annotatedClasses = scanControllers(packageToScan);
+        List<Class<?>> annotatedClasses = scanControllers("controllers");
         
-        // Affichage de la liste finale
         for (Class<?> clazz : annotatedClasses) {
-            System.out.println("Contrôleur détecté : " + clazz.getName());
+            Method[] methods = clazz.getDeclaredMethods();
+            for (Method method : methods) {
+                if (method.isAnnotationPresent(UrlMapping.class)) {
+                    UrlMapping annotation = method.getAnnotation(UrlMapping.class);
+                    String url = annotation.value();
+                    
+                    // Stockage du nom de la classe et du nom de l'annotation
+                    Mapping mapping = new Mapping(clazz.getName(), UrlMapping.class.getName());
+                    urlMappingMap.put(url, mapping);
+                }
+            }
         }
-        
-        System.out.println("=== FIN SCANNING DES CONTROLLERS ===");
+        System.out.println("=== FIN SCANNING DES URLS ===");
     }
 
     private List<Class<?>> scanControllers(String packageName) {
         List<Class<?>> controllers = new ArrayList<>();
         String path = packageName.replace('.', '/');
-        
         try {
             ClassLoader classLoader = DispatcherServlet.class.getClassLoader();
             Enumeration<URL> resources = classLoader.getResources(path);
-            
             while (resources.hasMoreElements()) {
                 URL resource = resources.nextElement();
-                
-                // Cas 1 : Les fichiers sont dans un dossier physique classique
                 if (resource.getProtocol().equals("file")) {
                     File directory = new File(resource.getFile());
                     if (directory.exists() && directory.isDirectory()) {
@@ -60,20 +73,14 @@ public class DispatcherServlet extends HttpServlet {
                             }
                         }
                     }
-                } 
-                // Cas 2 : Les fichiers sont empaquetés dans votre fichier .jar (Scénario Tomcat)
-                else if (resource.getProtocol().equals("jar")) {
+                } else if (resource.getProtocol().equals("jar")) {
                     JarURLConnection jarConnection = (JarURLConnection) resource.openConnection();
                     try (JarFile jar = jarConnection.getJarFile()) {
                         Enumeration<JarEntry> entries = jar.entries();
-                        
                         while (entries.hasMoreElements()) {
                             JarEntry entry = entries.nextElement();
                             String name = entry.getName();
-                            
-                            // On cherche les fichiers .class dans le package spécifié
                             if (name.startsWith(path + "/") && name.endsWith(".class")) {
-                                // Convertir le chemin du fichier en nom de classe (ex: controllers/BController.class -> controllers.BController)
                                 String className = name.substring(0, name.length() - 6).replace('/', '.');
                                 Class<?> clazz = Class.forName(className);
                                 if (clazz.isAnnotationPresent(Controller.class)) {
@@ -85,34 +92,24 @@ public class DispatcherServlet extends HttpServlet {
                 }
             }
         } catch (Exception e) {
-            System.out.println("Erreur lors du scan du package : " + e.getMessage());
             e.printStackTrace();
         }
         return controllers;
     }
-    //qui capture les requqetes classiques (refa mi-click lien)
+
     @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) 
-            throws ServletException, IOException {
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         processRequest(request, response);
     }
 
     @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) 
-            throws ServletException, IOException {
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         processRequest(request, response);
     }
         
-    //on renvoie la requête à la méthode processRequest pour traitement
-    private void processRequest(HttpServletRequest request, HttpServletResponse response) 
-            throws ServletException, IOException {
-        
-        List<Class<?>> annotatedClasses = scanControllers("controllers");
-    
-        // 2. On stocke cette liste dans un attribut de la requête nommé "listeControllers"
-        request.setAttribute("listeControllers", annotatedClasses);
-        
-        // 3. On redirige vers la vue JSP
+    private void processRequest(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        // 🎯 Envoi de la Map à la JSP
+        request.setAttribute("listeMappings", urlMappingMap);
         request.getRequestDispatcher("/WEB-INF/vues/accueil.jsp").forward(request, response);
     }
 }
