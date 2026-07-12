@@ -9,9 +9,9 @@ echo
 # CONFIGURATION CORRIGÉE POUR VOTRE STRUCTURE
 # ====================================================================
 APP_NAME="Url"
-SRC_DIR="src/main/java"      # 👈 Pointe directement sur votre dossier de code
-WEB_DIR="WEB-INF"            # 👈 Votre WEB-INF est à la racine du projet
-LIB_DIR="WEB-INF/lib"        # 👈 Votre dossier lib est dans WEB-INF
+SRC_DIR="src/main/java"      
+WEB_DIR="webapp/WEB-INF"     # 👈 Modifié pour pointer sur webapp/WEB-INF
+LIB_DIR="webapp/WEB-INF/lib"      
 BUILD_DIR="build"
 JAR_NAME="mon-framework.jar"
 
@@ -67,20 +67,23 @@ echo
 # ====================================================================
 # [2/5] COMPILATION ET CREATION DU JAR
 # ====================================================================
+# ====================================================================
+# [2/5] COMPILATION ET CREATION DU JAR
+# ====================================================================
 echo "[2/5] Compilation et creation du fichier .jar..."
 
 mkdir -p "bin_classes"
 
-# On vérifie si le dossier de code source existe bien à l'emplacement du script
 if [ ! -d "$SRC_DIR" ]; then
-    echo "ERREUR: Le dossier source '$SRC_DIR' est introuvable depuis cet emplacement !"
-    echo "Vérifiez que vous lancez le script depuis le bon dossier dans votre terminal."
+    echo "ERREUR: Le dossier source '$SRC_DIR' est introuvable !"
     rm -rf bin_classes
     exit 1
 fi
 
-# Recherche et compilation des fichiers Java
+# 1. On trouve TOUS les fichiers .java de manière récursive
 find "$SRC_DIR" -name "*.java" > sources.txt
+
+# 2. Compilation globale vers bin_classes
 javac -encoding UTF-8 -cp "$SERVLET_API_JAR:$LIB_DIR/*" -d "bin_classes" @sources.txt
 
 if [ $? -ne 0 ]; then
@@ -91,7 +94,7 @@ if [ $? -ne 0 ]; then
 fi
 rm -f sources.txt
 
-# Creation du JAR à la racine du projet
+# 3. CREATION DU JAR : On s'assure d'inclure toute l'arborescence compilée
 jar -cvf "$JAR_NAME" -C bin_classes . > /dev/null
 
 if [ ! -f "$JAR_NAME" ]; then
@@ -110,15 +113,15 @@ echo
 # ====================================================================
 echo "[3/5] Preparation de la structure Web..."
 
-# On recrée une arborescence propre pour Tomcat dans le dossier build
+# On recrée l'arborescence WEB-INF directement dans le build
 mkdir -p "$BUILD_DIR/WEB-INF/lib"
 
-# On copie le dossier WEB-INF (contenant vos vues et votre web.xml) dans build
+# CORRECTION DU DOUBLON : On copie le CONTENU de WEB-INF dans build/WEB-INF/
 if [ -d "$WEB_DIR" ]; then
-    cp -r "$WEB_DIR" "$BUILD_DIR/"
+    cp -r "$WEB_DIR"/* "$BUILD_DIR/WEB-INF/"
 fi
 
-# On y injecte votre JAR fraîchement créé
+# On injecte votre JAR fraîchement créé au bon endroit
 cp "$JAR_NAME" "$BUILD_DIR/WEB-INF/lib/"
 
 echo "OK"
@@ -129,7 +132,6 @@ echo
 # ====================================================================
 echo "[4/5] Copie des librairies externes..."
 
-# Copie des autres fichiers .jar (comme mysql ou gson), sauf servlet-api.jar
 for jar in "$LIB_DIR"/*.jar; do
     if [ -f "$jar" ] && [[ ! "$jar" =~ servlet-api ]]; then
         cp "$jar" "$BUILD_DIR/WEB-INF/lib/"
