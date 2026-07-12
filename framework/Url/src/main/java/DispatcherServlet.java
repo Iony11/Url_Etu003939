@@ -108,7 +108,7 @@ public class DispatcherServlet extends HttpServlet {
     }
         
     private void processRequest(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        // 🎯 Envoi de la Map à la JSP
+        
         request.setAttribute("listeMappings", urlMappingMap);
         request.getRequestDispatcher("/WEB-INF/vues/accueil.jsp").forward(request, response);
     }
